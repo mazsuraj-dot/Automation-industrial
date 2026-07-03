@@ -1,0 +1,309 @@
+[
+    {
+        "id": "3cc11d24.ff01a2",
+        "type": "comment",
+        "z": "f6f2187d.f17ca8",
+        "name": "WARNING: please check you have started this container with a volume that is mounted to /data\\n otherwise any flow changes are lost when you redeploy or upgrade the container\\n (e.g. upgrade to a more recent node-red docker image).\\n  If you are using named volumes you can ignore this warning.\\n Double click or see info side panel to learn how to start Node-RED in Docker to save your work",
+        "info": "\nTo start docker with a bind mount volume (-v option), for example:\n\n```\ndocker run -it -p 1880:1880 -v /home/user/node_red_data:/data --name mynodered nodered/node-red\n```\n\nwhere `/home/user/node_red_data` is a directory on your host machine where you want to store your flows.\n\nIf you do not do this then you can experiment and redploy flows, but if you restart or upgrade the container the flows will be disconnected and lost. \n\nThey will still exist in a hidden data volume, which can be recovered using standard docker techniques, but that is much more complex than just starting with a named volume as described above.",
+        "x": 350,
+        "y": 80,
+        "wires": []
+    },
+    {
+        "id": "f22a52dc7dab61b1",
+        "type": "change",
+        "z": "f6f2187d.f17ca8",
+        "name": "",
+        "rules": [
+            {
+                "t": "set",
+                "p": "TAG1",
+                "pt": "flow",
+                "to": "value",
+                "tot": "msg"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 1260,
+        "y": 580,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "199755e7bff785c8",
+        "type": "tcp request",
+        "z": "f6f2187d.f17ca8",
+        "name": "",
+        "server": "192.168.2.133",
+        "port": "2404",
+        "out": "sit",
+        "ret": "buffer",
+        "splitc": " ",
+        "newline": "",
+        "trim": false,
+        "tls": "",
+        "x": 810,
+        "y": 960,
+        "wires": [
+            [
+                "af957ff60e84df4f"
+            ]
+        ]
+    },
+    {
+        "id": "d0aed9289c3a9850",
+        "type": "inject",
+        "z": "f6f2187d.f17ca8",
+        "name": "START_DT",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "1",
+        "crontab": "",
+        "once": true,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "START",
+        "payloadType": "str",
+        "x": 390,
+        "y": 740,
+        "wires": [
+            [
+                "af957ff60e84df4f"
+            ]
+        ]
+    },
+    {
+        "id": "616075d58c4d6420",
+        "type": "inject",
+        "z": "f6f2187d.f17ca8",
+        "name": "INTERROGATION_COMMAND",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "5",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "IC",
+        "payloadType": "str",
+        "x": 460,
+        "y": 860,
+        "wires": [
+            [
+                "af957ff60e84df4f"
+            ]
+        ]
+    },
+    {
+        "id": "021882a30ff9b813",
+        "type": "debug",
+        "z": "f6f2187d.f17ca8",
+        "name": "",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1270,
+        "y": 900,
+        "wires": []
+    },
+    {
+        "id": "af957ff60e84df4f",
+        "type": "function",
+        "z": "f6f2187d.f17ca8",
+        "name": "IEC60870-5-104 MASTER",
+        "func": "if(context.global.sequenceRx===undefined || context.global.sequenceRx===null) context.global.sequenceRx = 0;\nif(context.global.sequenceTx===undefined || context.global.sequenceTx===null) context.global.sequenceTx = 0;\nif(context.global.dataTransfer===undefined || context.global.dataTransfer===null) context.global.dataTransfer = false;\n\nvar bufferIn = [];\nvar bufferOut = [];\n\nif(msg.payload === \"START\") {\n    context.global.sequenceRx = 0;\n    context.global.sequenceTx = 0;\n    bufferOut = [104, 4, 7, 0, 0, 0];\n}\nelse if(msg.payload === \"STOP\") {\n    bufferOut = [104, 4, 19, 0, 0, 0];\n}\nelse if(msg.payload === \"TEST\") {\n    bufferOut = [104, 4, 67, 0, 0, 0];\n}\nelse if(msg.payload === \"IC\") {\n    bufferOut = [104, 14, 0, 0, 0, 0, 100, 1, 6, 0, 1, 0, 0, 0, 0, 20];\n}\nelse {\n    var rawData = msg.payload;\n    if(!Buffer.isBuffer(rawData)) { rawData = Buffer.from(rawData); }\n    \n    // Strip APCI start byte (0x68) and length\n    for(var x = 2; x < rawData.length; x++) bufferIn.push(rawData[x]);\n\n    if (bufferIn.length > 0 && !bitRead(bufferIn[0], 0)) { // I-FORMAT\n        context.global.sequenceRx++; \n        var type = bufferIn[4];\n        var count = bufferIn[5] & 127;\n        var ca = bufferIn[8] | (bufferIn[9] << 8);\n\n        // Type 34 Parsing: M_ME_TD_1 (12 Bytes per data object structure)\n        if (type === 34 || type === 0x22) {\n            for (var h = 0; h < count; h++) {\n                var baseIdx = 10 + (h * 12); \n                if(baseIdx + 4 < bufferIn.length) {\n                    var ioa = bufferIn[baseIdx] | (bufferIn[baseIdx + 1] << 8) | (bufferIn[baseIdx + 2] << 16);\n                    \n                    // FIXED: Correctly parse 16-bit signed normalized integer telegram value\n                    var rawVal = bufferIn[baseIdx + 3] | (bufferIn[baseIdx + 4] << 8);\n                    \n                    // Handle standard 16-bit sign extension for negative steps\n                    if (rawVal & 0x8000) {\n                        rawVal = rawVal - 0x10000;\n                    }\n                    \n                    // FIXED MATH: IEC 104 Normalized values are scaled by 32767\n                    var scaledFloat = rawVal / 32767.0; \n                    \n                    var outMsg = {\n                        payload: Number(scaledFloat.toFixed(3)), // This will output exactly 0.200\n                        type: \"M_ME_TD_1\",\n                        ca: Number(ca),\n                        ioa: Number(ioa),\n                        value: Number(scaledFloat.toFixed(3))\n                    };\n                    node.send([null, outMsg]);\n                }\n            }\n            inviaS(); \n        }\n        else {\n            inviaS(); \n        }\n    }\n}\n\nfunction inviaBuf(buffer, lung) {\n    bufferOut.push(0x68); bufferOut.push(lung); \n    for (var i = 0; i < lung; i++) bufferOut.push(buffer[i]);\n}\nfunction inviaU(msgByte) { var buf = [msgByte,0,0,0]; inviaBuf(buf, 4); }\nfunction inviaS() {\n    var buf = [0x01,0,0,0];\n    buf[2] = (context.global.sequenceRx << 1) & 255;\n    buf[3] = (context.global.sequenceRx >> 7) & 255;\n    inviaBuf(buf, 4);\n}\nfunction bitRead(num,bit) { return ((num & (1 << bit)) !== 0); }\n\nif(bufferOut.length > 0) { return [{ payload: Buffer.from(bufferOut) }, null]; }\nreturn null;\n",
+        "outputs": 2,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 800,
+        "y": 800,
+        "wires": [
+            [
+                "199755e7bff785c8"
+            ],
+            [
+                "aa471da734c75d93"
+            ]
+        ]
+    },
+    {
+        "id": "d8b17b5c93904a2c",
+        "type": "inject",
+        "z": "f6f2187d.f17ca8",
+        "name": "STOP_DT",
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "STOP",
+        "payloadType": "str",
+        "x": 380,
+        "y": 780,
+        "wires": [
+            [
+                "af957ff60e84df4f"
+            ]
+        ]
+    },
+    {
+        "id": "578410a406c54ba6",
+        "type": "range",
+        "z": "f6f2187d.f17ca8",
+        "minin": "0.0",
+        "maxin": "1.0",
+        "minout": "0.0",
+        "maxout": "100.00",
+        "action": "scale",
+        "round": false,
+        "property": "value",
+        "name": "",
+        "x": 1170,
+        "y": 800,
+        "wires": [
+            [
+                "021882a30ff9b813",
+                "f22a52dc7dab61b1"
+            ]
+        ]
+    },
+    {
+        "id": "aa471da734c75d93",
+        "type": "switch",
+        "z": "f6f2187d.f17ca8",
+        "name": "",
+        "property": "ioa",
+        "propertyType": "msg",
+        "rules": [
+            {
+                "t": "eq",
+                "v": "102",
+                "vt": "num"
+            }
+        ],
+        "checkall": "true",
+        "repair": false,
+        "outputs": 1,
+        "x": 1070,
+        "y": 680,
+        "wires": [
+            [
+                "578410a406c54ba6"
+            ]
+        ]
+    },
+    {
+        "id": "2d2fa4180fc43aed",
+        "type": "inject",
+        "z": "f6f2187d.f17ca8",
+        "name": "TEST",
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "TEST",
+        "payloadType": "str",
+        "x": 370,
+        "y": 820,
+        "wires": [
+            [
+                "af957ff60e84df4f"
+            ]
+        ]
+    },
+    {
+        "id": "35ee3c1519769a96",
+        "type": "comment",
+        "z": "f6f2187d.f17ca8",
+        "name": "Esempio di lettura IOA",
+        "info": "Esempio",
+        "x": 840,
+        "y": 600,
+        "wires": []
+    },
+    {
+        "id": "a20ef1a85ea1148d",
+        "type": "comment",
+        "z": "f6f2187d.f17ca8",
+        "name": "Comandi MASTER",
+        "info": "",
+        "x": 390,
+        "y": 700,
+        "wires": []
+    },
+    {
+        "id": "7f1f2be62203d6bc",
+        "type": "opcua-compact-server",
+        "z": "f6f2187d.f17ca8",
+        "port": "4840",
+        "endpoint": "",
+        "productUri": "",
+        "acceptExternalCommands": true,
+        "maxAllowedSessionNumber": 10,
+        "maxConnectionsPerEndpoint": 10,
+        "maxAllowedSubscriptionNumber": 100,
+        "alternateHostname": "",
+        "name": "",
+        "showStatusActivities": false,
+        "showErrors": false,
+        "allowAnonymous": true,
+        "individualCerts": false,
+        "isAuditing": false,
+        "serverDiscovery": true,
+        "xmlsetsOPCUA": [],
+        "publicCertificateFile": "",
+        "privateCertificateFile": "",
+        "registerServerMethod": 1,
+        "discoveryServerEndpointUrl": "opc.tcp://0.0.0.0:4840",
+        "capabilitiesForMDNS": "",
+        "maxNodesPerRead": 1000,
+        "maxNodesPerWrite": 1000,
+        "maxNodesPerHistoryReadData": 100,
+        "maxNodesPerBrowse": 3000,
+        "maxBrowseContinuationPoints": 10,
+        "maxHistoryContinuationPoints": 10,
+        "delayToInit": 1000,
+        "delayToClose": 200,
+        "serverShutdownTimeout": 100,
+        "addressSpaceScript": "function constructAlarmAddressSpace(server, addressSpace, eventObjects, done) {\n  const opcua = coreServer.choreCompact.opcua;\n  const LocalizedText = opcua.LocalizedText;\n  const namespace = addressSpace.getOwnNamespace();\n\n  // Initialize our tracking variable inside the flow memory if it doesn't exist\n  if (sandboxFlowContext.get(\"TAG1\") === undefined || sandboxFlowContext.get(\"TAG1\") === null) {\n    sandboxFlowContext.set(\"TAG1\", 25);\n  }\n\n  // Register TAG1 directly inside the server's Objects root folder mapping\n  namespace.addVariable({\n    organizedBy: addressSpace.rootFolder.objects,\n    nodeId: \"ns=1;s=TAG1\",\n    browseName: \"TAG1\",\n    displayName: new LocalizedText({ text: \"TAG1\", locale: \"en-US\" }),\n    dataType: \"Int32\",\n    value: {\n      get: function () {\n        // Pulls the live integer value directly out of the memory context\n        const val = parseInt(sandboxFlowContext.get(\"TAG1\")) || 25;\n        return new opcua.Variant({ dataType: opcua.DataType.Int32, value: val });\n      },\n      set: function (variant) {\n        sandboxFlowContext.set(\"TAG1\", parseInt(variant.value));\n        return opcua.StatusCodes.Good;\n      }\n    }\n  });\n\n  done();\n}\n",
+        "x": 680,
+        "y": 460,
+        "wires": []
+    },
+    {
+        "id": "12af11f60cc1b125",
+        "type": "global-config",
+        "env": [],
+        "modules": {
+            "node-red-contrib-opcua-server": "1.1.1"
+        }
+    }
+]

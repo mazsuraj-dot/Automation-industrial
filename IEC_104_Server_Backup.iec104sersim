@@ -1,0 +1,79 @@
+21.06.018
+1
+Running
+0.0.0.0
+2404
+0.0.0.0
+TRUE
+12
+8
+30
+15
+10
+20
+10000
+5000
+50
+0
+TRUE
+1
+1
+0
+0
+0
+0
+TRUE
+FALSE
+FALSE
+C:\Program Files (x86)\FreyrSCADA Embedded Solution\IEC 60870-5-104 Server Simulator
+10
+FALSE
+127.0.0.1
+2405
+0.0.0.0
+TRUE
+TRUE
+TRUE
+COT_TWO_BYTE
+0
+0.0.0.0
+0.0.0.0
+0.0.0.0
+0.0.0.0
+3
+1
+Measured Normalized
+M_ME_TD_1 = 34
+100
+10
+INROGEN = 20
+0
+STATUS_ONLY
+0
+PARAMETER_NONE
+1
+0
+2
+Set Point command - Normalized Value
+C_SE_TA_1 = 61
+1000
+10
+NOTUSED
+0
+DIRECT_OPERATE
+0
+PARAMETER_NONE
+1
+0
+1
+1
+1
+M_ME_TD_1
+100
+1.00000
+SB BL OV 
+ 14:45:55:078 - 20/05/2026 
+0
+0
+0
+

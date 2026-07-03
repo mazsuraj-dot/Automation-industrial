@@ -1,0 +1,17 @@
+Step-1 :Create the missing folder structure:
+
+mkdir -p /data/node_modules/node-red-contrib-opcua-server/certificates/
+
+Step-2 :Generate a self-signed 2048-bit certificate:
+
+openssl req -x509 -sha256 -nodes -days 365 -newkey rsa:2048 -keyout /data/node_modules/node-red-contrib-opcua-server/certificates/server_selfsigned_cert_2048.pem -out /data/node_modules/node-red-contrib-opcua-server/certificates/server_selfsigned_cert_2048.pem -subj "/CN=NodeRED-OPCUA-Server"
+
+
+step -3:Create the Private Key File
+
+openssl req -x509 -sha256 -nodes -days 365 -newkey rsa:2048 -keyout /data/node_modules/node-red-contrib-opcua-server/certificates/server_key_2048.pem -out /data/node_modules/node-red-contrib-opcua-server/certificates/server_selfsigned_cert_2048.pem -subj "/CN=NodeRED-OPCUA-Server"
+
+
+step 4-:Verify and Refresh
+
+ls -l /data/node_modules/node-red-contrib-opcua-server/certificates/
